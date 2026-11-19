@@ -1,12 +1,15 @@
 package org.ikigaidigital.application.service;
 
-import org.ikigaidigital.TimeDeposit;
 import org.ikigaidigital.TimeDepositCalculator;
 import org.ikigaidigital.application.port.in.UpdateTimeDepositBalancesUseCase;
 import org.ikigaidigital.application.port.out.TimeDepositRepository;
+import org.ikigaidigital.domain.model.TimeDepositBalance;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class UpdateTimeDepositBalancesService implements UpdateTimeDepositBalancesUseCase {
@@ -31,11 +34,21 @@ public class UpdateTimeDepositBalancesService implements UpdateTimeDepositBalanc
     @Override
     @Transactional
     public void updateAllBalances() {
-        List<TimeDeposit> timeDeposits = timeDepositRepository.findAll();
-        if (timeDeposits.isEmpty()) {
+        List<TimeDepositBalance> deposits = timeDepositRepository.findAllForBalanceUpdate();
+        if (deposits.isEmpty()) {
             return;
         }
-        timeDepositCalculator.updateBalance(timeDeposits);
-        timeDepositRepository.saveAll(timeDeposits);
+
+        Map<Integer, BigDecimal> updatedBalancesById = new LinkedHashMap<>();
+        for (TimeDepositBalance deposit : deposits) {
+            BigDecimal monthlyInterest = timeDepositCalculator.calculateMonthlyInterest(deposit.toTimeDeposit());
+            if (monthlyInterest.signum() != 0) {
+                updatedBalancesById.put(deposit.id(), deposit.balance().add(monthlyInterest));
+            }
+        }
+
+        if (!updatedBalancesById.isEmpty()) {
+            timeDepositRepository.updateBalances(updatedBalancesById);
+        }
     }
 }

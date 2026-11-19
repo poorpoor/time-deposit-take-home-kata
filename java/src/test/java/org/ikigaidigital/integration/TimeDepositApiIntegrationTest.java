@@ -168,6 +168,27 @@ class TimeDepositApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/time-deposits/balances/update preserves NUMERIC(19,2) precision without losing cents")
+    void preservesNumericPrecisionInDatabaseDuringBalanceUpdate() {
+        jdbcTemplate.update(
+            "INSERT INTO \"timeDeposits\" (id, \"planType\", days, balance) VALUES (?, ?, ?, ?), (?, ?, ?, ?)",
+            1, "basic", 20, new BigDecimal("1000000000000000.01"),
+            2, "basic", 45, new BigDecimal("1000000000000000.01")
+        );
+
+        ResponseEntity<Void> response = restTemplate.postForEntity(
+            "/api/v1/time-deposits/balances/update",
+            null,
+            Void.class
+        );
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+
+        Map<Integer, TimeDepositResponse> updated = fetchAllById();
+        assertThat(updated.get(1).getBalance()).isEqualByComparingTo("1000000000000000.01");
+        assertThat(updated.get(2).getBalance()).isEqualByComparingTo("1000833333333333.34");
+    }
+
+    @Test
     @DisplayName("GET /api/v1/time-deposits loads deposits and withdrawals in a single SQL query (no N+1)")
     void loadsDepositsAndWithdrawalsInSingleQuery() {
         for (int i = 1; i <= 5; i++) {

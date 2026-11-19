@@ -1,15 +1,17 @@
 package org.ikigaidigital.application.port.out;
 
-import org.ikigaidigital.TimeDeposit;
+import org.ikigaidigital.domain.model.TimeDepositBalance;
 import org.ikigaidigital.domain.model.TimeDepositWithWithdrawals;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 public interface TimeDepositRepository {
 
     List<TimeDepositWithWithdrawals> findAllWithWithdrawals();
 
-    List<TimeDeposit> findAll();
+    List<TimeDepositBalance> findAllForBalanceUpdate();
 
-    void saveAll(List<TimeDeposit> timeDeposits);
+    void updateBalances(Map<Integer, BigDecimal> updatedBalancesById);
 }

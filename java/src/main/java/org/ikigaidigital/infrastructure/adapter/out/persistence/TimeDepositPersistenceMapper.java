@@ -1,6 +1,6 @@
 package org.ikigaidigital.infrastructure.adapter.out.persistence;
 
-import org.ikigaidigital.TimeDeposit;
+import org.ikigaidigital.domain.model.TimeDepositBalance;
 import org.ikigaidigital.domain.model.TimeDepositWithWithdrawals;
 import org.ikigaidigital.domain.model.Withdrawal;
 
@@ -8,11 +8,11 @@ import java.util.List;
 
 public class TimeDepositPersistenceMapper {
 
-    public TimeDeposit toDomain(TimeDepositJpaEntity entity) {
-        return new TimeDeposit(
+    public TimeDepositBalance toDomainBalance(TimeDepositJpaEntity entity) {
+        return new TimeDepositBalance(
             entity.getId(),
             entity.getPlanType(),
-            entity.getBalance().doubleValue(),
+            entity.getBalance(),
             entity.getDays()
         );
     }
