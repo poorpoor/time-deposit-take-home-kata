@@ -22,24 +22,25 @@ public class TimeDepositCalculator {
     }
 
     /**
-     * Recalculates balances in place for each time deposit using the registered {@code InterestPolicy}
-     * for its plan type.
+     * Calculates the rounded monthly interest for a single deposit using the registered
+     * {@code InterestPolicy} for its plan type.
      *
-     * <p>Assumption: Internal monetary arithmetic and final rounding ({@link RoundingMode#HALF_UP} to
-     * 2 decimal places) are performed using {@link BigDecimal} to prevent IEEE-754 floating-point
-     * artifacts (such as {@code 100.10 + 0.08 = 100.17999999999999}), converting back to {@code Double}
-     * only at the frozen {@link TimeDeposit#setBalance(Double)} contract boundary. Unknown plan types
-     * accrue zero interest, preserving the original behavior.
+     * <p>Compatibility note: Intentionally preserves the original {@code double} calculation and
+     * {@code new BigDecimal(double).setScale(2, RoundingMode.HALF_UP)} rounding semantics so that
+     * {@link #updateBalance(List)} remains 100% behaviorally identical to the legacy implementation
+     * (including binary IEEE-754 edge cases such as basic {@code 18.00} and student {@code 6.00}).
      */
+    public BigDecimal calculateMonthlyInterest(TimeDeposit deposit) {
+        double unroundedInterest = policyRegistry.findByPlanType(deposit.getPlanType())
+            .map(policy -> policy.calculateMonthlyInterest(deposit))
+            .orElse(0.0);
+        return new BigDecimal(unroundedInterest).setScale(CURRENCY_SCALE, RoundingMode.HALF_UP);
+    }
+
     public void updateBalance(List<TimeDeposit> xs) {
         for (TimeDeposit deposit : xs) {
-            BigDecimal monthlyInterest = policyRegistry.findByPlanType(deposit.getPlanType())
-                .map(policy -> policy.calculateMonthlyInterest(deposit))
-                .orElse(BigDecimal.ZERO)
-                .setScale(CURRENCY_SCALE, RoundingMode.HALF_UP);
-
-            BigDecimal updatedBalance = BigDecimal.valueOf(deposit.getBalance()).add(monthlyInterest);
-            deposit.setBalance(updatedBalance.doubleValue());
+            BigDecimal roundedInterest = calculateMonthlyInterest(deposit);
+            deposit.setBalance(deposit.getBalance() + roundedInterest.doubleValue());
         }
     }
 }

@@ -2,12 +2,10 @@ package org.ikigaidigital.domain.policy;
 
 import org.ikigaidigital.TimeDeposit;
 
-import java.math.BigDecimal;
-
 public final class StudentInterestPolicy implements InterestPolicy {
 
     public static final String PLAN_TYPE = "student";
-    private static final BigDecimal ANNUAL_RATE = new BigDecimal("0.03");
+    private static final double ANNUAL_RATE = 0.03;
     private static final int INTEREST_CUTOFF_DAY = 366;
 
     @Override
@@ -16,10 +14,10 @@ public final class StudentInterestPolicy implements InterestPolicy {
     }
 
     @Override
-    public BigDecimal calculateMonthlyInterest(TimeDeposit timeDeposit) {
+    public double calculateMonthlyInterest(TimeDeposit timeDeposit) {
         int days = timeDeposit.getDays();
         if (days <= DEFAULT_GRACE_PERIOD_DAYS || days >= INTEREST_CUTOFF_DAY) {
-            return BigDecimal.ZERO;
+            return 0.0;
         }
         return InterestPolicy.monthlyInterest(timeDeposit.getBalance(), ANNUAL_RATE);
     }

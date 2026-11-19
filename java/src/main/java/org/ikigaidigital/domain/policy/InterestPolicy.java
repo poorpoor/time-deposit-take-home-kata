@@ -2,9 +2,6 @@ package org.ikigaidigital.domain.policy;
 
 import org.ikigaidigital.TimeDeposit;
 
-import java.math.BigDecimal;
-import java.math.MathContext;
-
 /**
  * Strategy for calculating unrounded monthly interest for a specific time deposit plan.
  *
@@ -15,15 +12,13 @@ import java.math.MathContext;
 public interface InterestPolicy {
 
     int DEFAULT_GRACE_PERIOD_DAYS = 30;
-    BigDecimal MONTHS_IN_YEAR = BigDecimal.valueOf(12);
+    double MONTHS_IN_YEAR = 12.0;
 
     String planType();
 
-    BigDecimal calculateMonthlyInterest(TimeDeposit timeDeposit);
+    double calculateMonthlyInterest(TimeDeposit timeDeposit);
 
-    static BigDecimal monthlyInterest(Double balance, BigDecimal annualRate) {
-        return BigDecimal.valueOf(balance)
-            .multiply(annualRate)
-            .divide(MONTHS_IN_YEAR, MathContext.DECIMAL128);
+    static double monthlyInterest(Double balance, double annualRate) {
+        return balance * annualRate / MONTHS_IN_YEAR;
     }
 }

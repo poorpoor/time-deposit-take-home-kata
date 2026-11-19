@@ -6,7 +6,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 
@@ -221,18 +220,18 @@ class TimeDepositCalculatorTest {
         }
 
         @Test
-        @DisplayName("avoids IEEE-754 floating-point drift during interest rounding and addition")
-        void avoidsFloatingPointDrift() {
+        @DisplayName("preserves original calculator rounding behavior on IEEE-754 boundary amounts")
+        void preservesOriginalRoundingOnFloatingPointBoundaries() {
             List<TimeDeposit> deposits = List.of(
-                new TimeDeposit(1, "basic", 100.10, 45),  // 100.10 + 0.08 = 100.18 (not 100.17999999999999)
-                new TimeDeposit(2, "basic", 18.00, 31)    // 18 * 0.01 / 12 = 0.015 -> HALF_UP 0.02 -> 18.02
+                new TimeDeposit(1, "basic", 18.00, 31),   // double 0.014999... -> new BigDecimal(double) -> 0.01 -> 18.01
+                new TimeDeposit(2, "student", 6.00, 31)   // double 0.014999... -> new BigDecimal(double) -> 0.01 -> 6.01
             );
 
             calculator.updateBalance(deposits);
 
             assertThat(deposits)
                 .extracting(TimeDeposit::getBalance)
-                .containsExactly(100.18, 18.02);
+                .containsExactly(18.01, 6.01);
         }
     }
 
@@ -250,8 +249,8 @@ class TimeDepositCalculatorTest {
                 }
 
                 @Override
-                public BigDecimal calculateMonthlyInterest(TimeDeposit timeDeposit) {
-                    return InterestPolicy.monthlyInterest(timeDeposit.getBalance(), new BigDecimal("0.06"));
+                public double calculateMonthlyInterest(TimeDeposit timeDeposit) {
+                    return InterestPolicy.monthlyInterest(timeDeposit.getBalance(), 0.06);
                 }
             };
 
@@ -275,8 +274,8 @@ class TimeDepositCalculatorTest {
                 }
 
                 @Override
-                public BigDecimal calculateMonthlyInterest(TimeDeposit timeDeposit) {
-                    return BigDecimal.ZERO;
+                public double calculateMonthlyInterest(TimeDeposit timeDeposit) {
+                    return 0.0;
                 }
             };
             InterestPolicy duplicate = new InterestPolicy() {
@@ -286,8 +285,8 @@ class TimeDepositCalculatorTest {
                 }
 
                 @Override
-                public BigDecimal calculateMonthlyInterest(TimeDeposit timeDeposit) {
-                    return BigDecimal.ONE;
+                public double calculateMonthlyInterest(TimeDeposit timeDeposit) {
+                    return 1.0;
                 }
             };
 
