@@ -1,0 +1,108 @@
+openapi: 3.0.3
+info:
+  title: XA Bank Time Deposit API
+  version: 1.0.0
+  description: >
+    Contract-first REST API for managing XA Bank time deposits.
+    Exposes strictly two business endpoints: retrieving all time deposits with their
+    withdrawals, and triggering a transactional monthly balance recalculation across all deposits.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: TimeDeposits
+    description: Operations for viewing time deposits and accruing monthly interest balances
+
+paths:
+  /api/v1/time-deposits:
+    get:
+      tags:
+        - TimeDeposits
+      summary: Retrieve all time deposits
+      description: Returns all time deposits along with their associated withdrawal records.
+      operationId: getAllTimeDeposits
+      responses:
+        '200':
+          description: List of all time deposits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimeDepositResponse'
+              example:
+                - id: 1
+                  planType: basic
+                  balance: 1234567.00
+                  days: 45
+                  withdrawals:
+                    - id: 1
+                      amount: 500.00
+                      date: '2026-01-15'
+
+  /api/v1/time-deposits/balances/update:
+    post:
+      tags:
+        - TimeDeposits
+      summary: Update balances of all time deposits
+      description: >
+        Recalculates and persists monthly interest for every eligible time deposit in a single
+        database transaction according to its plan rules (basic: 1%/12 after day 30;
+        student: 3%/12 for days 31..365; premium: 5%/12 after day 45).
+        WARNING: This operation is intentionally NON-IDEMPOTENT. Sending repeated requests will
+        accrue an additional month of interest on top of the updated balances each time.
+      operationId: updateAllTimeDepositBalances
+      responses:
+        '204':
+          description: All time deposit balances were recalculated and persisted successfully
+
+components:
+  schemas:
+    TimeDepositResponse:
+      type: object
+      required:
+        - id
+        - planType
+        - balance
+        - days
+        - withdrawals
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 1
+        planType:
+          type: string
+          example: basic
+        balance:
+          type: number
+          example: 1234567.00
+        days:
+          type: integer
+          format: int32
+          example: 45
+        withdrawals:
+          type: array
+          items:
+            $ref: '#/components/schemas/WithdrawalResponse'
+
+    WithdrawalResponse:
+      type: object
+      required:
+        - id
+        - amount
+        - date
+      properties:
+        id:
+          type: integer
+          format: int32
+          example: 1
+        amount:
+          type: number
+          example: 500.00
+        date:
+          type: string
+          format: date
+          example: '2026-01-15'

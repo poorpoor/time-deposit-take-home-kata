@@ -42,7 +42,7 @@ Package root: `org.ikigaidigital`
 
 ## 3. Coding & Testing Standards
 
-- **Contract-First OpenAPI**: Maintain `java/src/main/resources/openapi/time-deposit-api.yaml` as the single source of truth. Generate server interfaces and DTOs with `openapi-generator-maven-plugin` (`interfaceOnly=true`) and serve the exact same spec via Swagger UI.
+- **Contract-First OpenAPI**: Maintain `java/src/main/resources/static/openapi/time-deposit-api.yaml` as the single source of truth. Generate server interfaces and DTOs with `openapi-generator-maven-plugin` (`interfaceOnly=true`) and serve the exact same spec via Swagger UI.
 - **Target Java Version**: Compile with `<maven.compiler.release>17</maven.compiler.release>`. Prefer Java 17 `record`s over boilerplate POJOs or Lombok.
 - **Test-First Refactoring**: Write boundary and characterization tests before refactoring existing domain code (e.g., days `29, 30, 31`, `44, 45, 46`, `365, 366`).
 - **Behavior Over Mocks**: Prefer lightweight in-memory fakes for application service unit tests over Mockito interaction verification.
