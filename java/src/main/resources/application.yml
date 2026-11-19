@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: time-deposit-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/timedeposits}
+    username: ${DB_USERNAME:timedeposits}
+    password: ${DB_PASSWORD:timedeposits}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+      naming:
+        # Preserve exact quoted camelCase table/column identifiers ("timeDeposits", "planType", "timeDepositId")
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+  flyway:
+    locations:
+      - classpath:db/migration
+      - classpath:db/seed
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi/time-deposit-api.yaml
