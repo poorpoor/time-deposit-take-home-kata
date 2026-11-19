@@ -46,16 +46,11 @@ public class TimeDepositPersistenceAdapter implements TimeDepositRepository {
 
     @Override
     public void updateBalances(Map<Integer, BigDecimal> updatedBalancesById) {
-        if (updatedBalancesById.isEmpty()) {
-            return;
+        for (Map.Entry<Integer, BigDecimal> entry : updatedBalancesById.entrySet()) {
+            // Within the active transaction, getReferenceById returns the already-loaded managed entity
+            // from the persistence context without issuing a second SELECT; Hibernate flushes dirty rows on commit.
+            TimeDepositJpaEntity entity = springDataRepository.getReferenceById(entry.getKey());
+            entity.setBalance(entry.getValue().setScale(BALANCE_SCALE, RoundingMode.HALF_UP));
         }
-        List<TimeDepositJpaEntity> entities = springDataRepository.findAllById(updatedBalancesById.keySet());
-        for (TimeDepositJpaEntity entity : entities) {
-            BigDecimal updatedBalance = updatedBalancesById.get(entity.getId());
-            if (updatedBalance != null) {
-                entity.setBalance(updatedBalance.setScale(BALANCE_SCALE, RoundingMode.HALF_UP));
-            }
-        }
-        springDataRepository.saveAll(entities);
     }
 }
