@@ -14,7 +14,8 @@ This file defines the repository-level engineering rules, architectural boundari
    - `premium`: 5% annual / 12 monthly when `days > 45`.
    - Unknown plan types accrue `0` interest (balance unchanged).
    - Monthly interest is rounded to 2 decimal places using `RoundingMode.HALF_UP`.
-   - Perform internal monetary calculations with `BigDecimal` to avoid IEEE-754 floating-point drift, converting to `Double` only at the `TimeDeposit` boundary.
+   - `TimeDepositCalculator.updateBalance(List<TimeDeposit>)` MUST preserve the exact legacy `double` interest calculation and `new BigDecimal(double).setScale(2, RoundingMode.HALF_UP)` behavior (e.g., `basic 18.00 / day 31 -> 18.01`, `student 6.00 / day 31 -> 6.01`).
+   - Database persistence MUST preserve full `NUMERIC(19, 2)` `BigDecimal` principals (adding `BigDecimal` monthly interest directly to the persisted principal and skipping writes when interest is zero) and lock rows via `SELECT ... FOR UPDATE` (`ORDER BY id ASC`) to prevent lost updates under concurrent `POST` calls.
 3. **Strictly Two Business API Endpoints**
    - `GET /api/v1/time-deposits` → `200 OK` returning JSON array of `{ id, planType, balance, days, withdrawals }`.
    - `POST /api/v1/time-deposits/balances/update` → `204 No Content`, recalculating and persisting all balances in a single transaction (explicitly documented as non-idempotent).

@@ -57,11 +57,11 @@ Ensure Docker is running, then run:
 mvn -f java/pom.xml clean verify
 ```
 
-This executes all 30 tests across four layers:
-1. **Domain Unit & Boundary Tests** (`TimeDepositCalculatorTest`): tests all plan boundary conditions (`days` = `0, 29, 30, 31, 44, 45, 46, 365, 366`), `HALF_UP` rounding, floating-point stability, empty/zero/unknown edge cases, and custom `InterestPolicy` extensibility.
-2. **Application Service Tests** (`GetAllTimeDepositsServiceTest`, `UpdateTimeDepositBalancesServiceTest`): behavior-focused tests using a lightweight `InMemoryTimeDepositRepository` fake rather than brittle Mockito interaction verification.
+This executes all 34 tests across four layers:
+1. **Domain Unit & Boundary Tests** (`TimeDepositCalculatorTest`): tests all plan boundary conditions (`days` = `0, 29, 30, 31, 44, 45, 46, 365, 366`), legacy `HALF_UP` rounding compatibility (including IEEE-754 boundary cases `basic 18.00 -> 18.01` and `student 6.00 -> 6.01`), empty/zero/unknown edge cases, and custom `InterestPolicy` extensibility.
+2. **Application Service Tests** (`GetAllTimeDepositsServiceTest`, `UpdateTimeDepositBalancesServiceTest`): behavior-focused tests using a lightweight `InMemoryTimeDepositRepository` fake verifying exact `BigDecimal` persistence, zero-interest write skipping, and repeated non-idempotent accruals.
 3. **Architecture Enforcement Tests** (`HexagonalArchitectureTest` via ArchUnit): enforces pure Java domain, inward-pointing dependencies, interface-only ports, and adapter isolation.
-4. **Vertical-Slice Integration Tests** (`TimeDepositApiIntegrationTest` via Testcontainers PostgreSQL 16): validates Flyway migrations, Hibernate schema validation (`ddl-auto: validate`), both HTTP endpoints, non-idempotent repeated updates, Swagger UI / OpenAPI contract availability, and single-query `LEFT JOIN FETCH` loading (asserting `prepareStatementCount == 1`, preventing N+1 queries).
+4. **Vertical-Slice Integration Tests** (`TimeDepositApiIntegrationTest` via Testcontainers PostgreSQL 16): validates Flyway migrations, Hibernate schema validation (`ddl-auto: validate`), both HTTP endpoints, `NUMERIC(19, 2)` precision preservation for large principals (`1000000000000000.01`), concurrent `POST` serialization via PostgreSQL `SELECT ... FOR UPDATE` locks (preventing lost updates), Swagger UI / OpenAPI contract availability, and single-query `LEFT JOIN FETCH` loading (`prepareStatementCount == 1`, preventing N+1 queries).
 
 ---
 
@@ -75,6 +75,7 @@ java/src/main/java/org/ikigaidigital/
 ├── domain/                                      # Pure Java — zero Spring/JPA/Jackson imports
 │   ├── model/
 │   │   ├── Withdrawal.java                      # Immutable Java 17 record
+│   │   ├── TimeDepositBalance.java              # Full-precision NUMERIC(19,2) balance snapshot
 │   │   └── TimeDepositWithWithdrawals.java      # Read model preserving frozen TimeDeposit
 │   └── policy/
 │       ├── InterestPolicy.java                  # Strategy interface
@@ -125,13 +126,16 @@ Adding a new plan type or more complex calculation rule (e.g., tiered balance th
    - `POST /api/v1/time-deposits/balances/update` → `204 No Content`, no request body.
    - **Why `POST` instead of `PUT`?** Accruing monthly interest mutates balances on every invocation and is intentionally **non-idempotent** (calling it twice accrues two months of interest). This behavior is explicitly documented in the OpenAPI contract.
    - No extra business or actuator endpoints were added.
-3. **Monetary Precision (`BigDecimal`)**:
-   - The original `TimeDepositCalculator` performed `double` arithmetic and used `new BigDecimal(interest)` (which captures binary IEEE-754 inaccuracies, e.g., `100.10 + 0.08 = 100.17999999999999` and `0.015` rounding down to `0.01`).
-   - All internal interest calculations and `HALF_UP` rounding (scale 2) now use `BigDecimal`, converting back to `Double` only at the frozen `TimeDeposit.setBalance(Double)` boundary while preserving every business rule.
-4. **Exact Database Schema & N+1 Prevention**:
+3. **Exact Legacy Calculator Compatibility & Database Monetary Precision**:
+   - To guarantee 100% behavioral parity with the original `TimeDepositCalculator.updateBalance(List<TimeDeposit>)`, the refactored `InterestPolicy` strategies intentionally preserve the original `double` calculation and `new BigDecimal(double).setScale(2, RoundingMode.HALF_UP)` rounding semantics (verified with boundary cases `basic 18.00 / day 31 -> 18.01` and `student 6.00 / day 31 -> 6.01`).
+   - At the persistence boundary, full `NUMERIC(19, 2)` principals are kept in `BigDecimal` (`TimeDepositBalance`), monthly interest is added directly in `BigDecimal`, and deposits with zero accrued interest are skipped without being overwritten—preventing `double` truncation of large principals (e.g., `1000000000000000.01`).
+4. **Concurrency Safety (No Lost Updates)**:
+   - Under PostgreSQL's default `READ COMMITTED` isolation level, two concurrent `POST /api/v1/time-deposits/balances/update` requests would otherwise read the same initial balance and overwrite each other.
+   - `SpringDataTimeDepositRepository.findAllForUpdate()` acquires `PESSIMISTIC_WRITE` row locks in deterministic primary-key order (`SELECT ... ORDER BY id ASC FOR UPDATE`), serializing concurrent updates without deadlocks or lost updates (verified in `TimeDepositApiIntegrationTest` against live PostgreSQL 16).
+5. **Exact Database Schema & N+1 Prevention**:
    - PostgreSQL tables and columns match the specification verbatim (`"timeDeposits"`, `"planType"`, `withdrawals`, `"timeDepositId"`), enforced via Flyway `V1`, `PhysicalNamingStrategyStandardImpl`, and Hibernate `ddl-auto: validate`.
    - `spring.jpa.open-in-view` is disabled (`false`), and `GET /api/v1/time-deposits` fetches deposits and withdrawals in a single `LEFT JOIN FETCH` query (verified in `TimeDepositApiIntegrationTest`).
-5. **Separated Seed Data**:
+6. **Separated Seed Data**:
    - Because the API exposes only two endpoints (no creation endpoint), local startup loads sample data from `classpath:db/seed` so Swagger UI works out of the box. Integration tests override `spring.flyway.locations=classpath:db/migration` to test against a clean schema.
 
 ---
@@ -144,13 +148,13 @@ Adding a new plan type or more complex calculation rule (e.g., tiered balance th
 
 ### Reproducible AI Harness (Committed in Repository)
 To ensure consistent architectural constraints and reproducible AI behavior across sessions, the repository includes:
-- [`AGENTS.md`](AGENTS.md) — repository-level rules encoding non-negotiable constraints (frozen `TimeDeposit`/`updateBalance`, strictly 2 endpoints, exact DB schema, Hexagonal layer boundaries, `BigDecimal` policy, testing standards, and atomic commit conventions).
+- [`AGENTS.md`](AGENTS.md) — repository-level rules encoding non-negotiable constraints (frozen `TimeDeposit`/`updateBalance`, strictly 2 endpoints, exact DB schema, Hexagonal layer boundaries, legacy rounding compatibility, `NUMERIC(19,2)` precision, `FOR UPDATE` locking, testing standards, and atomic commit conventions).
 - [`.ai/workflows/01-characterization-tests.md`](.ai/workflows/01-characterization-tests.md) — boundary test checklist executed before touching `TimeDepositCalculator`.
 - [`.ai/workflows/02-hexagonal-review.md`](.ai/workflows/02-hexagonal-review.md) — architecture, persistence, and API contract review checklist.
 - [`.ai/workflows/03-pre-submission-review.md`](.ai/workflows/03-pre-submission-review.md) — final dead-code, test suite, and submission verification checklist.
 
 ### Summary of AI-Assisted vs. Human-Directed Work
-- **Human-directed decisions & review**: API contract design (`POST` non-idempotency semantics, `204 No Content`), Hexagonal package boundaries, Java 17 target compatibility, Docker/PostgreSQL setup, stage-by-stage approval, and final line-by-line review (including removing unused JPA constructors/getters and redundant mapping code).
+- **Human-directed decisions & review**: API contract design (`POST` non-idempotency semantics, `204 No Content`), Hexagonal package boundaries, Java 17 target compatibility, Docker/PostgreSQL setup, stage-by-stage approval, and independent review catching three subtle defects (legacy IEEE-754 rounding compatibility on `basic 18.00` / `student 6.00`, `NUMERIC(19, 2)` precision preservation on large principals, and PostgreSQL `FOR UPDATE` locking for concurrent updates), plus dead-code removal.
 - **AI-assisted implementation**: Drafting the characterization & boundary tests, scaffolding the `InterestPolicy` strategy classes, OpenAPI 3.0 contract and Maven codegen configuration, JPA/Flyway persistence adapter, ArchUnit rules, Testcontainers vertical-slice tests, and documentation — each verified immediately by Maven tests and committed atomically.
 
 ---
