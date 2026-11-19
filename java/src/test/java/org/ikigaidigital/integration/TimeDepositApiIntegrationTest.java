@@ -274,6 +274,27 @@ class TimeDepositApiIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST /api/v1/time-deposits/balances/update rolls back all balance changes when one deposit overflows NUMERIC(19,2)")
+    void rollsBackAllBalanceUpdatesWhenOneDepositOverflowsNumericColumn() {
+        jdbcTemplate.update(
+            "INSERT INTO \"timeDeposits\" (id, \"planType\", days, balance) VALUES (?, ?, ?, ?), (?, ?, ?, ?)",
+            1, "basic", 45, new BigDecimal("1200.00"),
+            2, "premium", 60, new BigDecimal("99999999999999999.00")
+        );
+
+        ResponseEntity<String> response = restTemplate.postForEntity(
+            "/api/v1/time-deposits/balances/update",
+            null,
+            String.class
+        );
+        assertThat(response.getStatusCode().is5xxServerError()).isTrue();
+
+        Map<Integer, TimeDepositResponse> afterFailure = fetchAllById();
+        assertThat(afterFailure.get(1).getBalance()).isEqualByComparingTo("1200.00");
+        assertThat(afterFailure.get(2).getBalance()).isEqualByComparingTo("99999999999999999.00");
+    }
+
+    @Test
     @DisplayName("GET /api/v1/time-deposits loads deposits and withdrawals in a single SQL query (no N+1)")
     void loadsDepositsAndWithdrawalsInSingleQuery() {
         for (int i = 1; i <= 5; i++) {
