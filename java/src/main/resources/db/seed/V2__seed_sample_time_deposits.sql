@@ -1,5 +1,5 @@
 -- Sample data for local exploration via Swagger UI.
--- Loaded only when classpath:db/seed is included in spring.flyway.locations (disabled in integration tests).
+-- Loaded only when the "demo" Spring profile is active.
 
 INSERT INTO "timeDeposits" (id, "planType", days, balance) VALUES
     (1, 'basic',   45,  1234567.00),

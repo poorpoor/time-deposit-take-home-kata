@@ -40,7 +40,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Testcontainers
 @TestPropertySource(properties = {
-    "spring.flyway.locations=classpath:db/migration",
     "spring.jpa.properties.hibernate.generate_statistics=true"
 })
 class TimeDepositApiIntegrationTest {
