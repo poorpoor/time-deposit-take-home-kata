@@ -18,8 +18,7 @@ spring:
       - classpath:db/seed
 
 springdoc:
-  api-docs:
-    enabled: false
   swagger-ui:
     path: /swagger-ui.html
     url: /openapi/time-deposit-api.yaml
+    disable-swagger-default-url: true
