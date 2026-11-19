@@ -39,7 +39,7 @@ public class TimeDepositPersistenceAdapter implements TimeDepositRepository {
 
     @Override
     public List<TimeDepositBalance> findAllForBalanceUpdate() {
-        return springDataRepository.findAllByOrderByIdAsc().stream()
+        return springDataRepository.findAllForUpdate().stream()
             .map(mapper::toDomainBalance)
             .toList();
     }
