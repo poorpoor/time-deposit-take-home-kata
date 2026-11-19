@@ -35,18 +35,8 @@ public class WithdrawalJpaEntity {
     protected WithdrawalJpaEntity() {
     }
 
-    public WithdrawalJpaEntity(TimeDepositJpaEntity timeDeposit, BigDecimal amount, LocalDate date) {
-        this.timeDeposit = timeDeposit;
-        this.amount = amount;
-        this.date = date;
-    }
-
     public Integer getId() {
         return id;
-    }
-
-    public TimeDepositJpaEntity getTimeDeposit() {
-        return timeDeposit;
     }
 
     public BigDecimal getAmount() {

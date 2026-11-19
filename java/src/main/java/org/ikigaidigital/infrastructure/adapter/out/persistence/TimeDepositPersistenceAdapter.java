@@ -48,10 +48,11 @@ public class TimeDepositPersistenceAdapter implements TimeDepositRepository {
 
     @Override
     public void saveAll(List<TimeDeposit> timeDeposits) {
-        Map<Integer, Double> updatedBalanceById = timeDeposits.stream()
-            .collect(Collectors.toMap(TimeDeposit::getId, TimeDeposit::getBalance));
+        List<Integer> ids = timeDeposits.stream()
+            .map(TimeDeposit::getId)
+            .toList();
 
-        List<TimeDepositJpaEntity> entities = springDataRepository.findAllById(updatedBalanceById.keySet());
+        List<TimeDepositJpaEntity> entities = springDataRepository.findAllById(ids);
         Map<Integer, TimeDepositJpaEntity> entityById = entities.stream()
             .collect(Collectors.toMap(TimeDepositJpaEntity::getId, Function.identity()));
 

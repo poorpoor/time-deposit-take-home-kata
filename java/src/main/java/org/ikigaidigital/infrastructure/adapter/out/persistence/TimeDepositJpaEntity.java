@@ -39,12 +39,6 @@ public class TimeDepositJpaEntity {
     protected TimeDepositJpaEntity() {
     }
 
-    public TimeDepositJpaEntity(String planType, int days, BigDecimal balance) {
-        this.planType = planType;
-        this.days = days;
-        this.balance = balance;
-    }
-
     public Integer getId() {
         return id;
     }
